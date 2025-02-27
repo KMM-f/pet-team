@@ -13,7 +13,7 @@ class Room(models.Model):
 
     name = models.CharField(max_length=100)
 
-    attendees = models.ForeignKey(User, on_delete=models.CASCADE, related_name="room_attendees")
+    attendees = models.ManyToManyField(User, related_name="room_attendees")
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="room_owner")
 
 
