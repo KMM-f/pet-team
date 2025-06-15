@@ -1,6 +1,13 @@
 export interface Meet{
-  id: number;
+  id?: number;
+  title: string,
   idOfPlace: number;
   date: Date;
-  picture:string[];
+}
+
+export interface MeetFormBack{
+  id?: number;
+  title: string,
+  idOfPlace: number;
+  date: string;
 }

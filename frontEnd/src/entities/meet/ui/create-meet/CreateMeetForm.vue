@@ -1,30 +1,99 @@
 <script setup lang="ts">
-  import {ref} from 'vue';
+  import {ref, watch} from 'vue';
+
   import { SelectDate } from '@/shared/ui/form';
   import {BaseButton} from '@/shared/ui';
+  //import { disable } from 'ol/rotationconstraint';
+  import {usePlacesListStore} from '@/entities/place'
+  import { useMeetsListStore } from '@/entities/meet';
+  import {type Meet} from '@/entities/meet'
 
-  const emit =defineEmits(['closeDialog','createPlace']);
+  import { type PlaceBack } from '@/entities/place';
+  import {convertCoordinateToBack} from '@/entities/place'
+
+  const placesListStore = usePlacesListStore();
+  const meetsListStore = useMeetsListStore()
+
+  const emit = defineEmits(['closeDialog','getCoordinate', 'addPointOnMap']);
+  const props = defineProps<{
+    isNewPlace: boolean
+  }>()
+  //const props = defineProps<{
+    //pointCoodinates: Coordinate,
+  //}>()
 
   const title = ref('')
+  const year = ref<string>('noselect')
+  const month = ref<string>('noselect')
+  const day = ref<string>('noselect')
+  const isFormValid = ref<boolean>(false)
+  const buttonColor = ref('grey');
 
-  let year:string;
-  let month:string;
-  let day:string;
+  watch([title,year,month,day], ()=>{
+    if (title.value && year.value !='noselect' && month.value!='noselect' && day.value!='noselect'){
+      isFormValid.value = true;
+    } else {
+      isFormValid.value = false;
+    }
+  })
+  watch(isFormValid, ()=>{
+    buttonColor.value = isFormValid.value ? 'aqua' : 'grey';
+  })
 
-  function getValueFromElem (e:Event) {
-    const elem = e.target as HTMLSelectElement
-    return elem.value
+  function resetForm(){
+    year.value = 'noselect'
+    month.value = 'noselect'
+    day.value = 'noselect'
+    title.value =''
   }
-  function setYear (e:Event) {
-    year = getValueFromElem(e);
+  async function postPlace() {
+    if(placesListStore.currentCoordinate){
+      const placeOfPoint:PlaceBack = convertCoordinateToBack(placesListStore.currentCoordinate)
+      await placesListStore.postToPlaceList(placeOfPoint)
+    }
   }
-  function setMonth (e:Event) {
-    month = getValueFromElem(e);
+  async function createPlaceAndMeet() {
+    emit('getCoordinate')
+    await postPlace();
+    console.log('CREATEPLACE после ЗАПРОСА НА БЭК')
+    if(placesListStore.currentPlace && placesListStore.currentPlace.id){
+      console.log('ID есть')
+      const dateOfMeet = new Date(+year.value,+month.value,+day.value)
+      const meet:Meet = {
+        title:title.value,
+        idOfPlace: placesListStore.currentPlace.id,
+        date: dateOfMeet,
+      }
+      meetsListStore.postToMeetsList(meet);
+    }
+    emit('addPointOnMap')
+    resetForm()
   }
-  function setDay (e:Event) {
-    day = getValueFromElem(e);
-    console.log('ДАТА:',year,month,day)
+
+  function createMeet(){
+    if(placesListStore.currentPlace && placesListStore.currentPlace.id){
+      console.log('ID есть')
+      const dateOfMeet = new Date(+year.value,+month.value,+day.value)
+      const meet:Meet = {
+        title:title.value,
+        idOfPlace: placesListStore.currentPlace.id,
+        date: dateOfMeet,
+      }
+      meetsListStore.postToMeetsList(meet);
+    }
+    resetForm()
   }
+
+  function handlerButtonClick(){
+    if(props.isNewPlace){
+      createPlaceAndMeet()
+    } else{
+      createMeet()
+      emit('closeDialog');
+    }
+  }
+
+
 </script>
 
 <template>
@@ -45,14 +114,15 @@
       </header>
       <SelectDate
       title="Выберите дату мероприятия"
-      @change-year="setYear"
-      @change-month="setMonth"
-      @change-day="setDay"/>
+      v-model:year="year"
+      v-model:day="day"
+      v-model:month="month"/>
       <div class="meta-form__button button">
-        <BaseButton @click="emit('createPlace')"
+        <BaseButton @click=" handlerButtonClick()"
           :width="100"
           :height="30"
-          color="aqua"
+          :color=buttonColor
+          :class ="{buttonDisable: !isFormValid}"
         > Создать
       </BaseButton>
       </div>
@@ -108,5 +178,9 @@
     width: 100px;
     height: 30px;
     background-color: green;
+  }
+  .buttonDisable{
+    pointer-events: none;
+    cursor: default;
   }
 </style>

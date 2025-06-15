@@ -87,12 +87,15 @@ import {toGeometry} from 'ol/render/Feature';
     map.addLayer(markerLayer)
   }
 
-  export function addPointOnMap(map:Map, coordinate:Coordinate,markerSource:VectorSource,markerLayer:VectorLayer) {
-    const currentPixel = map.getPixelFromCoordinate(coordinate)
+  export function findCoordinateForNewPoint(map:Map, coordinate:Coordinate){
+    const currentPixel = map.getPixelFromCoordinate(coordinate);
     const coordinateForPoint:Coordinate = assignCoordinateForPoint(map,currentPixel, coordinate);
-    const featurePoint = createFeatureOfPoint(coordinateForPoint);
-    addPointToLayers(map, featurePoint, markerSource, markerLayer)
     return coordinateForPoint;
+  }
+
+  export function addPointOnMap(map:Map, coordinate:Coordinate,markerSource:VectorSource,markerLayer:VectorLayer) {
+    const featurePoint = createFeatureOfPoint(coordinate);
+    addPointToLayers(map, featurePoint, markerSource, markerLayer)
   }
 /*
   //Функция для обнаружения Point в здании.

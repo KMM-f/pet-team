@@ -10,6 +10,11 @@ export {createPlaceFromBack, convertPlacesListFromBack, convertCoordinateToBack}
 //api > types
 export {type PlaceBack} from './api/types'
 
-//ui > confirm-modal
+//ui
+//    > confirm-modal
 import AddPlaceConfirmation from './ui/confirm-modal/AddPlaceConfirm.vue';
 export {AddPlaceConfirmation};
+
+//    >place-menu
+import PlaceMenu from './ui/place-menu/PlaceMenu.vue'
+export {PlaceMenu}
