@@ -11,27 +11,32 @@
   import { type Coordinate } from 'ol/coordinate';
   import { type MapBrowserEvent } from 'ol';
 //------------------------------------------------------------------------------------------------------------------------------------------------------------
-  import { onMounted, watch } from 'vue';
-
-  import {AddPlaceConfirmation} from '@/entities/place';
+  import { onMounted, watch, ref} from 'vue';
 
   import { CreateMeetForm } from '@/entities/meet';
-
-  import { type PlaceBack } from '@/entities/place';
-  import {convertCoordinateToBack} from '@/entities/place'
+  import {AddPlaceConfirmation} from '@/entities/place';
+  //import { type PlaceBack } from '@/entities/place';
+  //import {convertCoordinateToBack} from '@/entities/place'
   import {type Place} from '@/entities/place'
   import {usePlacesListStore} from '@/entities/place'
+  import {PlaceMenu} from '@/entities/place'
+  import { useMeetsListStore } from '@/entities/meet';
 
-  import {addPointOnMap} from '@/feature/marker'
+  import {addPointOnMap,findCoordinateForNewPoint} from '@/feature/marker'
 
   import { STYLE_JSON_MAPTILER_URL  } from '@/utils/constants';
 //------------------------------------------------------------------------------------------------------------------------------------------------------------
   const placesListStore = usePlacesListStore();
+  const meetsListStore = useMeetsListStore()
 
   let map:Map;
+
   let coordinateOnClick:Coordinate;
+  const isNewPlace =ref<boolean>(false);
+
   let addPlaceConfirmationOverlay: Overlay;
   let createMeetFormOverlay: Overlay;
+  let placeMenuOverlay: Overlay;
 
 // Слой для меток
   const markerSource = new VectorSource()
@@ -63,6 +68,7 @@
       overlay.setPosition(coordinate)
     }
   }
+
 //Инициализация карты
   function initMap (conformationOverlay:Overlay,createMeetOverlay:Overlay) {
     const map = new Map({
@@ -73,7 +79,7 @@
         }),
       ]),
       layers: [markerLayer],
-      overlays: [conformationOverlay,createMeetOverlay],
+      overlays: [conformationOverlay,createMeetOverlay,placeMenuOverlay],
       view: new View({
         constrainResolution: true,
         center: fromLonLat([104.2802, 52.2864]), // Центр карты
@@ -85,16 +91,37 @@
     return map;
   }
 
-  function createPlace(){
-    const coordinatePlace = addPointOnMap(map,coordinateOnClick,markerSource, markerLayer);
-    const placeOfPoint:PlaceBack = convertCoordinateToBack(coordinatePlace)
-    placesListStore.postToPlaceList(placeOfPoint);
+  function getPointCoordinate(){
+    placesListStore.currentCoordinate = findCoordinateForNewPoint(map,coordinateOnClick);
+  }
+
+  function addPoint() {
+    if(placesListStore.currentCoordinate){
+      addPointOnMap(map,placesListStore.currentCoordinate,markerSource, markerLayer)
+      placesListStore.currentCoordinate = null;
+      closeOverlay(createMeetFormOverlay)
+    }
+  }
+/*function addPoint(coordinate:Coordinate){
+    const coordinatePlace = addPointOnMap(map,coordinate,markerSource, markerLayer);
+    const placeOfPoint:PlaceBack = convertCoordinateToBack(coordinate)
+    const PostPlace = placesListStore.postToPlaceList(placeOfPoint);
+    PostPlace.then((result)=>{
+      if(result){
+        placesListStore.currentPlace= result;
+      }
+    })
     closeOverlay(createMeetFormOverlay)
   };
+*/
 
   function addMeetAtThisPlace () {
     closeOverlay(addPlaceConfirmationOverlay)
     showOverlay(createMeetFormOverlay,coordinateOnClick)
+  }
+
+  function IsOverlayShow(){
+    return !!addPlaceConfirmationOverlay.getPosition() || !!createMeetFormOverlay.getPosition() || !!placeMenuOverlay.getPosition()
   }
 //----------------------------------------------------------------------------------------------------------------------------------------
   onMounted(()=>{
@@ -115,14 +142,28 @@
     if (createMeetFormElem) {
       createMeetFormOverlay = overlayInit(createMeetFormElem);
     }
+    const placeMenuElem =document.getElementById('place-menu')
+    if (placeMenuElem){
+      placeMenuOverlay = overlayInit(placeMenuElem);
+    }
     // Создаем карту
     map = initMap(addPlaceConfirmationOverlay,createMeetFormOverlay);
     map.on('click', function(evt:MapBrowserEvent<UIEvent>){
+      if(IsOverlayShow()){
+        closeOverlay(createMeetFormOverlay);
+        closeOverlay(addPlaceConfirmationOverlay);
+        closeOverlay(placeMenuOverlay);
+      }
       coordinateOnClick = evt.coordinate;//Hundler putPoint() needs the current coordinates.
       const isHavePoint =placesListStore.checkHavePoint(map,coordinateOnClick);
       if (isHavePoint) {
-        showOverlay(createMeetFormOverlay,evt.coordinate)
+        placesListStore.currentPlace= isHavePoint;
+        isNewPlace.value = false;
+        meetsListStore.fetchMeetsList().then(()=>{
+          showOverlay(placeMenuOverlay,evt.coordinate)
+        })
       } else {
+        isNewPlace.value = true;
         showOverlay(addPlaceConfirmationOverlay,evt.coordinate)
       }
     })
@@ -138,7 +179,7 @@
 </script>
 
 <template>
-  <div id="map">
+  <div id="map" class="map">
     <a href="https://www.maptiler.com" style="position:absolute;left:10px;bottom:10px;z-index:999;">
       <img src="https://api.maptiler.com/resources/logo.svg" alt="MapTiler logo">
     </a>
@@ -149,11 +190,15 @@
   </p>
   <AddPlaceConfirmation id="pop-up"
     @close-pop-up="closeOverlay(addPlaceConfirmationOverlay)"
-    @put-point="addMeetAtThisPlace()"
-    />
+    @put-point="addMeetAtThisPlace()"/>
   <CreateMeetForm id="create-meet-form"
+    :is-new-place='isNewPlace'
     @close-dialog="closeOverlay(createMeetFormOverlay)"
-    @create-place="createPlace"/>
+    @get-coordinate="getPointCoordinate"
+    @add-point-on-map="addPoint"/>
+  <PlaceMenu id="place-menu"
+    @open-create-meet-form="showOverlay(createMeetFormOverlay,coordinateOnClick), closeOverlay(placeMenuOverlay)"
+    @close-place-menu="closeOverlay(placeMenuOverlay)"/>
 
 </template>
 

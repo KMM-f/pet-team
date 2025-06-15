@@ -14,6 +14,8 @@ import type { PlaceBack } from '../api/types';
 
 export const usePlacesListStore = defineStore('placesList', () => {
   const placesList =ref<Place[]>([])
+  const currentPlace =ref<Place>();
+  const currentCoordinate = ref<Coordinate|null>()
 
   const fetchPlaceList = async() =>{
     try{
@@ -46,20 +48,21 @@ export const usePlacesListStore = defineStore('placesList', () => {
   }
     //Функция для обнаружения Point в здании.
     function checkHavePoint (map:Map,coordinate:Coordinate) {
-      //const currentPixel = map.getPixelFromCoordinate(coordinateOnClick)!!!!!!!!!!!!!
       const currentPixel = map.getPixelFromCoordinate(coordinate)
       const isHavePoint = map.forEachFeatureAtPixel(currentPixel,(feature)=>{
-        if('getFlatCoordinates' in feature) {
+        //if('getFlatCoordinates' in feature)
+        const isBuilding = feature.getProperties().layer === "building";
+          if (isBuilding){
           const exnet = feature.getExtent();
           const result = placesList.value.find(function(item){
             return containsCoordinate(exnet,item.coordinate);
           })
-          return result ? true : false;
+          return result ? result : false;
         } else {
           return false
         }
       })
-      return isHavePoint;
+      return isHavePoint ? isHavePoint : false;
     }
 
   const postToPlaceList = async(placeToBack:PlaceBack) =>{
@@ -67,8 +70,8 @@ export const usePlacesListStore = defineStore('placesList', () => {
       const {data} = await axios.post(URL_PLACE_LIST,placeToBack);
       const mapperData = createPlaceFromBack(data)
       placesList.value = [...placesList.value, mapperData];
-      console.log(placesList.value, 'placesList.value ПОСЛЕ ДОБАВЛЕНИЯ НОВОГО ЭЛЕМЕНТА')
-      return data;
+      currentPlace.value = mapperData;
+      return mapperData;
     } catch (e) {
       // console.log(e);
 			if (axios.isAxiosError(e)) {
@@ -121,5 +124,5 @@ export const usePlacesListStore = defineStore('placesList', () => {
     }
   }
 
-  return { placesList, postToPlaceList, deletePlace, fetchPlaceList, checkHavePoint}
+  return { placesList, currentPlace,currentCoordinate, postToPlaceList, deletePlace, fetchPlaceList, checkHavePoint}
 })
